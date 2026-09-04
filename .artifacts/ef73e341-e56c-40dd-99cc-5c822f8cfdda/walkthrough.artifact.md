@@ -1,23 +1,25 @@
-# Walkthrough: Formateo de Precios y Previsualización en Tiempo Real
+# Walkthrough: Edición de Promociones y Restricción de Roles
 
-Se ha completado la estandarización del formateo de precios en toda la aplicación, asegurando que todos los montos de dinero utilicen el punto como separador de miles. Además, se han añadido previsualizaciones dinámicas en todos los campos de entrada de montos para evitar errores humanos al escribir muchos ceros.
+Se ha implementado la capacidad de editar promociones existentes y se ha verificado la seguridad por roles para esta sección.
 
 ## Cambios Realizados
 
-### Componentes de Entrada (Modales)
-- **[PaymentModal.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/components/PaymentModal.tsx)**: Añadida confirmación formateada (ej: $40.000) debajo de los campos de Efectivo y QR en el modo de Pago Mixto.
-- **[CashMovementModal.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/components/CashMovementModal.tsx)**: Implementada una caja de "Valor Formateado" que aparece mientras el usuario escribe el fondo inicial o un retiro.
-- **[CashClosureModal.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/components/CashClosureModal.tsx)**: Añadida previsualización debajo del monto declarado para facilitar el arqueo de caja.
+### Gestión de Promociones
+- **[PromosPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/PromosPage.tsx)**:
+    - Se añadió un botón de **Editar** (icono de lápiz) en cada promoción de la lista.
+    - Al editar, el formulario carga automáticamente los datos de la promo y cambia el botón principal a "Actualizar Promo".
+    - Se incluyó un botón de **Cancelar** para limpiar el formulario y salir del modo edición.
+    - La lógica de guardado ahora detecta si debe crear una nueva promo o actualizar una existente en Firestore.
 
-### Páginas de Gestión (Inventario y Promos)
-- **[ProductManagement.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/ProductManagement.tsx)**: Ahora los campos de Costo, Precio Lista y Precio Efectivo muestran su versión formateada justo debajo del input.
-- **[PromosPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/PromosPage.tsx)**: Añadida la misma lógica de previsualización para la creación de combos.
+### Seguridad por Roles
+- **[App.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/App.tsx)**:
+    - Se confirmó que la ruta `/promos` está protegida y solo es accesible para: `dueño`, `encargado_barra`, `encargado_boliche` y `developer`.
+    - Los usuarios con rol `cajero` no tienen acceso a esta pantalla, cumpliendo con la solicitud de restricción.
 
 ## Verificación
 
 > [!TIP]
-> Para verificar estos cambios, abre cualquier modal que requiera ingresar un monto (ej: Retiro o Nueva Promo) y observa cómo aparece el texto "Formato: $X.XXX" a medida que escribes.
+> Para probar la edición, ve a la sección de **Promos**, busca una promo activa y haz clic en el icono del lápiz azul. El formulario se llenará solo y podrás cambiar precios o productos.
 
-1. **Lectura**: Se verificó que en el Dashboard y la página de Inventario todos los precios cargados desde Firebase se muestran correctamente formateados.
-2. **Ingreso**: Se comprobó que el cajero recibe feedback visual inmediato sobre la escala del número ingresado (evitando confundir 10.000 con 100.000).
-3. **Consistencia**: Todos los componentes utilizan ahora la utilidad centralizada `formatPrice` de `web/src/utils/format.ts`.
+1. **Edición**: Se probó editando el nombre y el precio de una promo, verificando que los cambios impactan inmediatamente en el POS.
+2. **Seguridad**: Se validó que al intentar entrar como `cajero`, el sistema redirige correctamente a la pantalla de "No autorizado".

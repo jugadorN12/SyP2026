@@ -1,6 +1,7 @@
-- [x] Añadir previsualización formateada en `PaymentModal.tsx`
-- [x] Añadir previsualización formateada en `CashMovementModal.tsx`
-- [x] Añadir previsualización formateada en `CashClosureModal.tsx`
-- [x] Revisar alertas en `POSPage.tsx`
-- [x] Verificar consistencia en `InventoryPage.tsx` y `Dashboard.tsx`
-- [x] Añadir previsualización en `ProductManagement.tsx` y `PromosPage.tsx`
+- [x] Implementar funcionalidad de edición en `PromosPage.tsx`
+    - [x] Añadir estado `editingId`
+    - [x] Crear función `handleEditClick`
+    - [x] Modificar `handleCreatePromo` para soportar actualizaciones
+    - [x] Añadir botón de cancelar edición
+- [x] Verificar y ajustar restricciones de roles en `App.tsx`
+- [x] Verificar despliegue y funcionamiento

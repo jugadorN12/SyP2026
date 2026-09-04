@@ -1,33 +1,33 @@
-# Plan de Implementación: Formateo de Precios (Separador de Miles)
+# Plan de Implementación: Edición de Promociones y Restricción de Roles
 
-El objetivo de este plan es estandarizar la visualización de todos los montos de dinero en la aplicación, utilizando el punto `.` como separador de miles (ej: `$40.000` en lugar de `$40000`) para mejorar la legibilidad y evitar errores de cobro.
+El objetivo es permitir que los encargados editen promociones existentes y asegurar que solo el personal autorizado (Encargados de Barra, Encargado General/Boliche y Dueños) tenga acceso a esta sección.
+
+## User Review Required
+
+> [!IMPORTANT]
+> Se mantendrá la restricción actual en las rutas que ya incluye a `dueño`, `encargado_barra`, `encargado_boliche` y `developer`, excluyendo a los `cajeros` del menú de promociones, tal como se solicitó.
 
 ## Proposed Changes
 
-### 1. Utilidad de Formateo
-#### [NEW] `web/src/utils/format.ts`
-- Implementar `formatPrice(amount: number): string` que utilice `toLocaleString('es-AR')`.
-- Esta función asegurará que siempre se use el punto para los miles y la coma para los decimales (si los hay).
+### 1. Gestión de Promociones
+#### [MODIFY] [PromosPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/PromosPage.tsx)
+- **Estado de Edición**: Añadir `editingId: string | null` para rastrear si se está editando una promo.
+- **Acción de Editar**: Añadir un botón con el icono `Edit2` en la lista de promociones. Al hacer clic, se cargarán los datos de la promo en el formulario y se hará scroll hacia arriba.
+- **Actualización en Firestore**: Modificar `handleCreatePromo` para que use `updateDoc` si `editingId` está presente, o `addDoc` si es una nueva.
+- **Botón Dinámico**: El botón principal cambiará su texto a "Actualizar Promo" y el icono a `Save` cuando esté en modo edición.
+- **Botón Cancelar**: Añadir un botón para salir del modo edición y limpiar el formulario.
 
-### 2. Actualización de Componentes de Visualización
-Se reemplazará el uso de `.toLocaleString()` directo o la falta de formateo por la nueva utilidad en los siguientes archivos:
-- **POS**: `ProductButton.tsx`, `CartaProductButton.tsx`, `CartSidebar.tsx`, `POSPage.tsx`.
-- **Inventario**: `InventoryPage.tsx`, `ProductManagement.tsx`, `PromosPage.tsx`.
-- **Caja**: `CashClosureModal.tsx`, `FinancialCard.tsx`, `Dashboard.tsx`.
-
-### 3. Mejora en Modales de Cobro e Ingreso (Inputs)
-#### [MODIFY] `web/src/components/PaymentModal.tsx`
-- Formatear el total a cobrar y el ahorro.
-- Mostrar una vista previa formateada del monto ingresado en los campos "Efectivo" y "Digital" para que el cajero vea el punto mientras escribe (o justo debajo).
-
-#### [MODIFY] `web/src/components/CashMovementModal.tsx`
-- Añadir una visualización grande y formateada del monto que se está ingresando para confirmar la lectura (ej: si escribe 15000, ver en grande **$15.000**).
+### 2. Seguridad y Roles
+#### [MODIFY] [App.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/App.tsx)
+- Verificar y ajustar las `allowedRoles` en la ruta `/promos` para asegurar que coincida exactamente con lo solicitado (excluir cajeros).
 
 ## Plan de Verificación
 
-### Prueba de Lectura
-- Verificar que en el POS todos los precios de botellas y combos muestren el punto (ej: $55.000).
-- Comprobar que en el Dashboard los ingresos totales sean legibles (ej: $1.250.000).
+### Pruebas de Funcionalidad
+- **Creación**: Verificar que se pueden seguir creando promos nuevas.
+- **Edición**: Seleccionar una promo existente, cambiar su precio y productos, y verificar que se actualice correctamente sin crear un duplicado.
+- **Cancelación**: Iniciar una edición y cancelarla; el formulario debe quedar vacío y el estado volver a "Nueva Promo".
 
-### Prueba de Cobro
-- En el modal de pago mixto, ingresar un monto y verificar que el sistema muestre la resta con el punto de miles correctamente.
+### Pruebas de Seguridad
+- Intentar acceder a la ruta `/promos` con un usuario de rol `cajero` y verificar que sea redirigido a `/unauthorized`.
+- Verificar que `encargado_barra` y `encargado_boliche` puedan entrar y operar normalmente.
