@@ -1,0 +1,6 @@
+- [x] Añadir previsualización formateada en `PaymentModal.tsx`
+- [x] Añadir previsualización formateada en `CashMovementModal.tsx`
+- [x] Añadir previsualización formateada en `CashClosureModal.tsx`
+- [x] Revisar alertas en `POSPage.tsx`
+- [x] Verificar consistencia en `InventoryPage.tsx` y `Dashboard.tsx`
+- [x] Añadir previsualización en `ProductManagement.tsx` y `PromosPage.tsx`
