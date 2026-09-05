@@ -1,33 +1,35 @@
-# Plan de Implementación: Edición de Promociones y Restricción de Roles
+# Plan de Implementación: Control Estricto de Distribución de Stock Global
 
-El objetivo es permitir que los encargados editen promociones existentes y asegurar que solo el personal autorizado (Encargados de Barra, Encargado General/Boliche y Dueños) tenga acceso a esta sección.
+Este plan asegura que la mercadería repartida en las barras nunca supere el total físico del boliche (Stock Global). El sistema validará en tiempo real que ningún cajero pueda recibir más bebida de la que realmente hay disponible para distribuir.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> Se mantendrá la restricción actual en las rutas que ya incluye a `dueño`, `encargado_barra`, `encargado_boliche` y `developer`, excluyendo a los `cajeros` del menú de promociones, tal como se solicitó.
+> **Definición de Disponibilidad**:
+> `Disponible para Barra X = Stock Global - Suma de Stock en todas las DEMÁS barras`.
+> Si una barra intenta cargar más de lo disponible, el sistema bloqueará el guardado para evitar inconsistencias contables.
 
 ## Proposed Changes
 
-### 1. Gestión de Promociones
-#### [MODIFY] [PromosPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/PromosPage.tsx)
-- **Estado de Edición**: Añadir `editingId: string | null` para rastrear si se está editando una promo.
-- **Acción de Editar**: Añadir un botón con el icono `Edit2` en la lista de promociones. Al hacer clic, se cargarán los datos de la promo en el formulario y se hará scroll hacia arriba.
-- **Actualización en Firestore**: Modificar `handleCreatePromo` para que use `updateDoc` si `editingId` está presente, o `addDoc` si es una nueva.
-- **Botón Dinámico**: El botón principal cambiará su texto a "Actualizar Promo" y el icono a `Save` cuando esté en modo edición.
-- **Botón Cancelar**: Añadir un botón para salir del modo edición y limpiar el formulario.
+### 1. Validación en el Conteo Inicial
+#### [MODIFY] [InitialInventoryCheck.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/InitialInventoryCheck.tsx)
+- **Cálculo de Límites**: El componente recuperará el inventario de todos los sectores para calcular cuánto queda "libre" de cada producto.
+- **UI de Advertencia**: Se mostrará un texto descriptivo: *"Máximo para distribuir: X"* bajo cada campo de entrada.
+- **Validación Dinámica**: Los inputs se marcarán en rojo si el número es inválido y el botón de confirmar se deshabilitará automáticamente.
 
-### 2. Seguridad y Roles
-#### [MODIFY] [App.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/App.tsx)
-- Verificar y ajustar las `allowedRoles` en la ruta `/promos` para asegurar que coincida exactamente con lo solicitado (excluir cajeros).
+### 2. Consistencia en Ventas (POS)
+#### [MODIFY] [POSPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/POSPage.tsx)
+- Reforzar el uso de `writeBatch` para que cada venta reste simultáneamente del stock de la barra y del stock global del producto.
 
-## Plan de Verificación
+### 3. Visibilidad para el Encargado
+#### [MODIFY] [BarMonitorPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/BarMonitorPage.tsx)
+- Añadir un resumen de **"Stock en Depósito"** (lo que no está en ninguna barra pero existe en el boliche).
 
-### Pruebas de Funcionalidad
-- **Creación**: Verificar que se pueden seguir creando promos nuevas.
-- **Edición**: Seleccionar una promo existente, cambiar su precio y productos, y verificar que se actualice correctamente sin crear un duplicado.
-- **Cancelación**: Iniciar una edición y cancelarla; el formulario debe quedar vacío y el estado volver a "Nueva Promo".
+## Verification Plan
 
-### Pruebas de Seguridad
-- Intentar acceder a la ruta `/promos` con un usuario de rol `cajero` y verificar que sea redirigido a `/unauthorized`.
-- Verificar que `encargado_barra` y `encargado_boliche` puedan entrar y operar normalmente.
+### Prueba de Tope de Stock
+1. Configurar "Fernet" con Stock Global: **10**.
+2. **Barra VIP**: Cargar 7 unidades. (Permitido).
+3. **Barra 1**: Intentar cargar 5 unidades. (Bloqueado: Debe decir *"Máximo disponible: 3"*).
+4. **Barra 1**: Cargar 3 unidades. (Permitido).
+5. **Cualquier Barra**: Verificar que no se pueden cargar más Fernets hasta que se vendan o se aumente el stock global.

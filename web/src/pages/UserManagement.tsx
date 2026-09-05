@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, query } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { User, UserRole } from '../types/auth';
-import { UserPlus, Edit2, Shield, Power } from 'lucide-react';
+import { UserPlus, Edit2, Shield, Power, Key } from 'lucide-react';
+import { useSectors } from '../hooks/useSectors';
+import { hashPin } from '../utils/security';
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const { sectors } = useSectors();
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
@@ -14,6 +17,7 @@ const UserManagement: React.FC = () => {
   const [rol, setRol] = useState<UserRole>('cajero');
   const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
+  const [sectorId, setSectorId] = useState('');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -41,20 +45,39 @@ const UserManagement: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pin.length < 4) return alert("El PIN debe tener al menos 4 números");
+
     try {
       await addDoc(collection(db, 'users'), {
         nombre,
         rol,
-        pin, // In production, hash this!
+        pin: hashPin(pin), // SECURE: Hash the PIN before saving
         email: rol === 'dueño' || rol === 'encargado_boliche' ? email : '',
         activo: true,
-        sectorId: 'general'
+        sectorId: sectorId || 'global'
       });
       setShowModal(false);
       resetForm();
       fetchUsers();
+      alert("Usuario creado exitosamente");
     } catch (err) {
       console.error("Error adding user:", err);
+      alert("Error al crear usuario");
+    }
+  };
+
+  const handleResetPin = async (userId: string) => {
+    const newPin = prompt("Ingresa el nuevo PIN de acceso (mínimo 4 números):");
+    if (!newPin || newPin.length < 4) return alert("PIN inválido");
+
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        pin: hashPin(newPin)
+      });
+      alert("PIN actualizado con éxito");
+      fetchUsers();
+    } catch (err) {
+      alert("Error al actualizar PIN");
     }
   };
 
@@ -73,6 +96,7 @@ const UserManagement: React.FC = () => {
     setRol('cajero');
     setPin('');
     setEmail('');
+    setSectorId('');
   };
 
   return (
@@ -83,7 +107,7 @@ const UserManagement: React.FC = () => {
             <h1 className="text-3xl font-bold flex items-center gap-3">
               <Shield className="text-primary-500" /> Gestión de Personal
             </h1>
-            <p className="text-slate-400">Administra roles, accesos y PINs</p>
+            <p className="text-slate-400">Administra roles, accesos y PINs de seguridad</p>
           </div>
           <button
             onClick={() => setShowModal(true)}
@@ -99,48 +123,63 @@ const UserManagement: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className={`bg-slate-900 border ${user.activo ? 'border-slate-800' : 'border-red-900/50 opacity-60'} rounded-3xl p-6 transition-all`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                    user.rol === 'dueño' ? 'bg-amber-500/20 text-amber-500' :
-                    user.rol === 'cajero' ? 'bg-primary-500/20 text-primary-500' :
-                    'bg-emerald-500/20 text-emerald-500'
-                  }`}>
-                    <UserIcon size={24} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => toggleUserStatus(user)} className={`p-2 rounded-xl transition-colors ${
-                      user.activo ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+            {users.map((user) => {
+              const sector = sectors.find(s => s.id === user.sectorId);
+              return (
+                <div
+                  key={user.id}
+                  className={`bg-slate-900 border ${user.activo ? 'border-slate-800' : 'border-red-900/50 opacity-60'} rounded-3xl p-6 transition-all`}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      user.rol === 'dueño' ? 'bg-amber-500/20 text-amber-500' :
+                      user.rol === 'cajero' ? 'bg-primary-500/20 text-primary-500' :
+                      'bg-emerald-500/20 text-emerald-500'
                     }`}>
-                      <Power size={18} />
-                    </button>
-                    <button className="p-2 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700">
-                      <Edit2 size={18} />
-                    </button>
+                      <UserIconLocal size={24} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleResetPin(user.id)}
+                        className="p-2 bg-slate-800 text-slate-400 rounded-xl hover:text-amber-500 transition-colors"
+                        title="Cambiar PIN"
+                      >
+                        <Key size={18} />
+                      </button>
+                      <button onClick={() => toggleUserStatus(user)} className={`p-2 rounded-xl transition-colors ${
+                        user.activo ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                      }`}>
+                        <Power size={18} />
+                      </button>
+                      <button className="p-2 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700">
+                        <Edit2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-1">{user.nombre}</h3>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">{user.rol.replace('_', ' ')}</span>
+                    {sector && (
+                        <span className="text-[10px] bg-slate-800 text-primary-400 px-2 py-0.5 rounded uppercase font-black">{sector.nombre}</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t border-slate-800">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Acceso:</span>
+                      <span className="font-mono text-emerald-500 font-bold uppercase tracking-tighter">PIN Protegido</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Estado:</span>
+                      <span className={user.activo ? 'text-emerald-500' : 'text-red-500'}>
+                        {user.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-
-                <h3 className="text-xl font-bold mb-1">{user.nombre}</h3>
-                <div className="text-sm font-medium text-slate-500 uppercase tracking-widest mb-4">{user.rol}</div>
-
-                <div className="space-y-2 pt-4 border-t border-slate-800">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">PIN de acceso:</span>
-                    <span className="font-mono text-primary-400">****</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Estado:</span>
-                    <span className={user.activo ? 'text-emerald-500' : 'text-red-500'}>
-                      {user.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -170,16 +209,31 @@ const UserManagement: React.FC = () => {
                     <option value="dueño">Dueño</option>
                   </select>
                 </div>
-                {rol === 'cajero' && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">PIN (4 dígitos)</label>
-                    <input
-                      value={pin} onChange={(e) => setPin(e.target.value)}
-                      className="w-full bg-slate-800 border-none rounded-xl p-3 text-white font-mono"
-                      placeholder="1234" maxLength={4} required
-                    />
-                  </div>
-                )}
+
+                <div>
+                    <label className="block text-sm text-slate-400 mb-1">Asignar Barra (Sector)</label>
+                    <select
+                        value={sectorId} onChange={(e) => setSectorId(e.target.value)}
+                        className="w-full bg-slate-800 border-none rounded-xl p-3 text-white"
+                    >
+                        <option value="global">Stock General (Encargados)</option>
+                        {sectors.map(s => (
+                            <option key={s.id} value={s.id}>{s.nombre} ({s.tipo})</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">PIN de acceso (Mínimo 4 números)</label>
+                  <input
+                    type="password"
+                    value={pin} onChange={(e) => setPin(e.target.value)}
+                    className="w-full bg-slate-800 border-none rounded-xl p-3 text-white font-mono"
+                    placeholder="****" maxLength={6} required
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 italic">* El PIN se guardará de forma encriptada para mayor seguridad.</p>
+                </div>
+
                 <div className="flex gap-4 mt-8">
                   <button
                     type="button" onClick={() => setShowModal(false)}
@@ -204,7 +258,7 @@ const UserManagement: React.FC = () => {
 };
 
 // Internal icon wrapper since I used Lucide but named it UserIcon in the code above
-const UserIcon = ({ size, className }: { size?: number, className?: string }) => (
+const UserIconLocal = ({ size, className }: { size?: number, className?: string }) => (
   <svg
     width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"

@@ -7,11 +7,33 @@ export interface Product {
   costo: number;
   color: string;
   activo: boolean;
-  stockActual: number;
+  stockActual: number; // This will represent Global stock (sum of all sectors)
   stockMinimo: number;
   esCarta: boolean;
   proveedorTelefono?: string;
 }
+
+export interface InventoryItem {
+  id: string; // sectorId_productId
+  sectorId: string;
+  productId: string;
+  stockActual: number;
+  stockMinimo: number;
+  ultimaActualizacion: number;
+}
+
+export interface Session {
+  id: string;
+  sectorId: string;
+  usuarioId: string;
+  usuarioNombre: string;
+  fecha: string; // YYYY-MM-DD
+  conteoCompletado: boolean;
+  timestampInicio: number;
+  timestampFin?: number;
+  stockInicial?: Record<string, number>;
+}
+
 
 export interface Promo {
   id: string;

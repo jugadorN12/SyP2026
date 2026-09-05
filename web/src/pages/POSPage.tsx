@@ -11,17 +11,25 @@ import CashClosureModal from '../components/CashClosureModal';
 import PaymentModal from '../components/PaymentModal';
 import CashMovementModal from '../components/CashMovementModal';
 import OfflineStatus from '../components/OfflineStatus';
+import NotificationCenter from '../components/NotificationCenter';
 import { LogOut, User as UserIcon, ArrowLeftRight, Landmark, Tag, Wallet, BookOpen, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAlerts } from '../hooks/useAlerts';
-import { onSnapshot, collection, addDoc } from 'firebase/firestore';
+import { onSnapshot, collection, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { formatPrice } from '../utils/format';
+import { useSession } from '../hooks/useSession';
+import { useInventory } from '../hooks/useInventory';
+import { useSectors } from '../hooks/useSectors';
 
 const POSPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { products, loading: productsLoading } = useProducts();
+  const { sectors, loading: sectorsLoading } = useSectors();
+  const { inventory, loading: inventoryLoading } = useInventory(user?.sectorId);
+  const { activeSession, loading: sessionLoading } = useSession(user?.sectorId);
+
   const {
     items,
     addProductToCart,
@@ -31,7 +39,22 @@ const POSPage: React.FC = () => {
     undoLastItem,
     clearCart
   } = useCart();
-  const { alerts } = useAlerts(products);
+
+  // Merge products with sector inventory for display
+  const sectorProducts = products.map(p => {
+    const isManager = user?.rol !== 'cajero';
+    // If it's a manager (General, Barra, Dueño), use the product's base stockActual (Global)
+    if (isManager || user?.sectorId === 'global') return p;
+
+    // Otherwise (it's a barman/cajero), look in the sector-specific inventory
+    const inv = inventory.find(i => i.productId === p.id);
+    return {
+        ...p,
+        stockActual: inv ? inv.stockActual : 0
+    };
+  });
+
+  const { alerts } = useAlerts(sectorProducts);
 
   const [activeCategory, setActiveCategory] = useState('carta');
   const [showClosure, setShowClosure] = useState(false);
@@ -44,11 +67,17 @@ const POSPage: React.FC = () => {
   const [totalDigitalVentas, setTotalDigitalVentas] = useState(0);
   const [totalRetiros, setTotalRetiros] = useState(0);
 
+  // Mandatory check: Redirect to initial inventory if no session today
+  useEffect(() => {
+    if (!sessionLoading && !activeSession && user?.rol === 'cajero') {
+      navigate('/pos/initial-check');
+    }
+  }, [activeSession, sessionLoading, user, navigate]);
+
   useEffect(() => {
     const unsubPromos = onSnapshot(collection(db, 'promos'), (snap: any) => {
       setPromos(snap.docs.map((d: any) => {
         const data = d.data();
-        // NORMALIZE PROMOS
         const pLista = data.precioLista !== undefined ? data.precioLista : (data.precioPromo || 0);
         const pEfectivo = data.precioEfectivo !== undefined ? data.precioEfectivo : pLista;
         return {
@@ -62,7 +91,7 @@ const POSPage: React.FC = () => {
     });
 
     const savedInitial = localStorage.getItem('syp_initial_cash');
-    if (!savedInitial && !initialCash) {
+    if (!savedInitial && !initialCash && user?.rol === 'cajero') {
       setShowCashMovement('inicial');
     } else if (savedInitial) {
       setInitialCash(parseFloat(savedInitial));
@@ -74,15 +103,18 @@ const POSPage: React.FC = () => {
   const handleCheckout = async (montoEfectivo: number, montoDigital: number, metodo: string) => {
     try {
       const finalTotal = metodo === 'efectivo' ? totalEfectivo : totalLista;
+      const batch = writeBatch(db);
 
-      await addDoc(collection(db, 'sales'), {
+      const saleRef = doc(collection(db, 'sales'));
+      batch.set(saleRef, {
         cajeroId: user?.id,
+        cajeroNombre: user?.nombre,
         timestamp: Date.now(),
         total: finalTotal,
         montoEfectivo,
         montoDigital,
         metodoPago: metodo,
-        sectorId: 'barra_1',
+        sectorId: user?.sectorId || 'unknown',
         items: items.map(i => ({
           id: i.id,
           nombre: i.nombre,
@@ -92,6 +124,40 @@ const POSPage: React.FC = () => {
         }))
       });
 
+      for (const item of items) {
+        if (item.type === 'product') {
+            const prodRef = doc(db, 'products', item.id);
+            const globalStock = products.find(p => p.id === item.id)?.stockActual || 0;
+            batch.update(prodRef, { stockActual: Math.max(0, globalStock - item.cantidad) });
+
+            if (user?.sectorId && user.sectorId !== 'global') {
+                const inventoryId = `${user.sectorId}_${item.id}`;
+                const invRef = doc(db, 'inventory', inventoryId);
+                const currentStock = sectorProducts.find(p => p.id === item.id)?.stockActual || 0;
+                batch.update(invRef, { stockActual: Math.max(0, currentStock - item.cantidad) });
+            }
+        } else {
+            // Promo: Deduct each product in promo
+            const promo = item.originalItem as Promo;
+            if (promo.productos) {
+                for (const pItem of promo.productos) {
+                    const prodRef = doc(db, 'products', pItem.id);
+                    const pGlobalStock = products.find(p => p.id === pItem.id)?.stockActual || 0;
+                    batch.update(prodRef, { stockActual: Math.max(0, pGlobalStock - (pItem.cantidad * item.cantidad)) });
+
+                    if (user?.sectorId && user.sectorId !== 'global') {
+                        const inventoryId = `${user.sectorId}_${pItem.id}`;
+                        const invRef = doc(db, 'inventory', inventoryId);
+                        const pCurrentStock = sectorProducts.find(p => p.id === pItem.id)?.stockActual || 0;
+                        batch.update(invRef, { stockActual: Math.max(0, pCurrentStock - (pItem.cantidad * item.cantidad)) });
+                    }
+                }
+            }
+        }
+      }
+
+      await batch.commit();
+
       setTotalEfectivoVentas(prev => prev + montoEfectivo);
       setTotalDigitalVentas(prev => prev + montoDigital);
 
@@ -99,34 +165,42 @@ const POSPage: React.FC = () => {
       clearCart();
       alert('Venta finalizada con éxito');
     } catch (err) {
+      console.error(err);
       alert('Error al registrar venta');
     }
   };
 
-  const handleCashMovement = async (amount: number, note: string) => {
+  const handleCashMovement = async (amount: number, _note: string) => {
     if (showCashMovement === 'inicial') {
       setInitialCash(amount);
       localStorage.setItem('syp_initial_cash', amount.toString());
     } else {
       setTotalRetiros(prev => prev + amount);
-      console.log(`Retiro de $${amount} registrado por: ${note}`);
     }
     setShowCashMovement(null);
   };
 
   const expectedCash = (initialCash || 0) + totalEfectivoVentas - totalRetiros;
 
-  const filteredProducts = products.filter(p => p.categoria === activeCategory);
-  const cartaProducts = products.filter(p => p.esCarta);
+  const filteredProducts = sectorProducts.filter(p => p.categoria === activeCategory);
+  const cartaProducts = sectorProducts.filter(p => p.esCarta);
   const cartaPromos = promos.filter(p => p.esCarta);
 
   const checkPromoStock = (promo: Promo) => {
     if (!promo.productos) return true;
     return promo.productos.every(pItem => {
-      const product = products.find(p => p.id === pItem.id);
+      const product = sectorProducts.find(p => p.id === pItem.id);
       return product && product.stockActual >= pItem.cantidad;
     });
   };
+
+  if (productsLoading || inventoryLoading || sessionLoading || sectorsLoading) {
+    return <div className="h-screen bg-slate-950 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500"></div></div>;
+  }
+
+  // Get Sector Name from sectors list
+  const currentSector = sectors.find(s => s.id === user?.sectorId);
+  const sectorName = currentSector ? currentSector.nombre : (user?.sectorId === 'root' ? 'Admin' : 'Sin Barra');
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 text-white overflow-hidden relative">
@@ -138,12 +212,13 @@ const POSPage: React.FC = () => {
             <div className="hidden sm:flex items-center gap-2 text-slate-400">
               <UserIcon size={18} />
               <span className="font-bold text-slate-200">{user?.nombre}</span>
-              <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-500 uppercase tracking-widest ml-2">Barra 1</span>
+              <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-500 uppercase tracking-widest ml-2">{sectorName}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <OfflineStatus />
+            {user?.rol !== 'cajero' && <NotificationCenter />}
             <button onClick={() => navigate('/transfers')} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 rounded-xl border border-slate-800 transition-all">
               <ArrowLeftRight size={20} /><span className="text-xs font-black uppercase hidden lg:inline">Traspasos</span>
             </button>

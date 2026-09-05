@@ -1,25 +1,26 @@
-# Walkthrough: Edición de Promociones y Restricción de Roles
+# Walkthrough: Control Estricto de Distribución de Stock
 
-Se ha implementado la capacidad de editar promociones existentes y se ha verificado la seguridad por roles para esta sección.
+Se ha implementado una capa de seguridad crítica que garantiza que el stock distribuido entre las barras nunca supere el **Stock Global** disponible en el boliche. Esto asegura un recuento exacto y evita la "creación" de stock inexistente durante la jornada.
 
 ## Cambios Realizados
 
-### Gestión de Promociones
-- **[PromosPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/PromosPage.tsx)**:
-    - Se añadió un botón de **Editar** (icono de lápiz) en cada promoción de la lista.
-    - Al editar, el formulario carga automáticamente los datos de la promo y cambia el botón principal a "Actualizar Promo".
-    - Se incluyó un botón de **Cancelar** para limpiar el formulario y salir del modo edición.
-    - La lógica de guardado ahora detecta si debe crear una nueva promo o actualizar una existente en Firestore.
+### 1. Validación Inteligente en el Conteo
+- **[InitialInventoryCheck.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/InitialInventoryCheck.tsx)**:
+    - El sistema ahora calcula dinámicamente el **Máximo Disponible** para cada barra.
+    - `Disponible = Stock Global - Suma de Stock en otras barras`.
+    - Si un cajero intenta ingresar más de lo disponible, el campo se marca en **rojo** y el botón de inicio se bloquea.
+    - Se añadió una etiqueta informativa debajo de cada producto indicando la disponibilidad real en el boliche.
 
-### Seguridad por Roles
-- **[App.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/App.tsx)**:
-    - Se confirmó que la ruta `/promos` está protegida y solo es accesible para: `dueño`, `encargado_barra`, `encargado_boliche` y `developer`.
-    - Los usuarios con rol `cajero` no tienen acceso a esta pantalla, cumpliendo con la solicitud de restricción.
+### 2. Visibilidad del Depósito (Sobrante)
+- **[BarMonitorPage.tsx](file:///C:/Users/simpl/AndroidStudioProjects/SyP/web/src/pages/BarMonitorPage.tsx)**:
+    - Se añadió una nueva sección: **"Stock Restante en Depósito"**.
+    - Permite al encargado ver exactamente cuántas botellas quedan "libres" para ser repartidas, facilitando la logística de reposición durante la noche.
 
 ## Verificación
 
-> [!TIP]
-> Para probar la edición, ve a la sección de **Promos**, busca una promo activa y haz clic en el icono del lápiz azul. El formulario se llenará solo y podrás cambiar precios o productos.
+> [!IMPORTANT]
+> **Ejemplo de Uso**: Si tienes 10 botellas de Gin en total (Stock Global) y la Barra VIP ya cargó 8, al abrir la Barra 1 el sistema te informará que solo puedes cargar un máximo de 2.
 
-1. **Edición**: Se probó editando el nombre y el precio de una promo, verificando que los cambios impactan inmediatamente en el POS.
-2. **Seguridad**: Se validó que al intentar entrar como `cajero`, el sistema redirige correctamente a la pantalla de "No autorizado".
+1. **Límites**: Se probó que al intentar superar el stock global, el sistema impide el avance y muestra alertas claras.
+2. **Sincronización**: Las ventas en el POS liberan stock global, lo que permite que el encargado asigne esas unidades a otras barras si fuera necesario.
+3. **Monitoreo**: El panel de encargado ahora refleja no solo lo que tienen los cajeros, sino también lo que queda guardado en el depósito central.

@@ -14,5 +14,8 @@ export interface User {
 export interface Sector {
   id: string;
   nombre: string;
-  tipo: 'barra' | 'deposito_general' | 'boliche_general';
+  tipo: 'barra' | 'deposito' | 'general';
+  cajeroAsignadoId?: string; // ID of current cashier/barman
+  activo: boolean;
 }
+

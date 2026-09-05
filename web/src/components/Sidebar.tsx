@@ -13,6 +13,8 @@ import {
   PlusCircle,
   Tag,
   Shield,
+  LayoutTemplate,
+  Activity,
   X
 } from 'lucide-react';
 
@@ -27,7 +29,9 @@ const Sidebar: React.FC = () => {
   const menuItems = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard', roles: ['dueño', 'encargado_boliche', 'developer'] },
     { name: 'Ventas (POS)', icon: <ShoppingCart size={20} />, path: '/pos', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },
+    { name: 'Monitor Real-Time', icon: <Activity size={20} />, path: '/monitor', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },
     { name: 'Inventario', icon: <Package size={20} />, path: '/inventory', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },
+    { name: 'Gestión de Barras', icon: <LayoutTemplate size={20} />, path: '/sectors', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },
     { name: 'Cargar Producto', icon: <PlusCircle size={20} />, path: '/products', roles: ['dueño', 'encargado_boliche', 'developer'] },
     { name: 'Gestionar Promos', icon: <Tag size={20} />, path: '/promos', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },
     { name: 'Traspasos', icon: <ArrowLeftRight size={20} />, path: '/transfers', roles: ['dueño', 'encargado_barra', 'encargado_boliche', 'developer'] },

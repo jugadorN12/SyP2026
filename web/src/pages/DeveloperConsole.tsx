@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { User, UserRole } from '../types/auth';
 import { hashPin } from '../utils/security';
-import { Shield, Key, UserPlus, Search } from 'lucide-react';
+import { Shield, Key, UserPlus, Search, Trash2 } from 'lucide-react';
 
 const DeveloperConsole: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   // New user form
   const [newNombre, setNewNombre] = useState('');
@@ -20,6 +21,38 @@ const DeveloperConsole: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleResetSystem = async () => {
+    const confirm1 = confirm("¿ESTÁS SEGURO? Esto borrará todas las VENTAS, INVENTARIOS, SESIONES y NOTIFICACIONES.");
+    if (!confirm1) return;
+    const confirm2 = prompt("Escribe 'ELIMINAR' para confirmar el reset de producción:");
+    if (confirm2 !== 'ELIMINAR') return;
+
+    setResetting(true);
+    try {
+      const collectionsToClear = ['sales', 'inventory', 'sessions', 'notifications'];
+
+      for (const collName of collectionsToClear) {
+        const q = await getDocs(collection(db, collName));
+        const batch = writeBatch(db);
+        q.docs.forEach((d: any) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      // Also reset product global stock to 0
+      const prodSnap = await getDocs(collection(db, 'products'));
+      const prodBatch = writeBatch(db);
+      prodSnap.docs.forEach((d: any) => prodBatch.update(d.ref, { stockActual: 0 }));
+      await prodBatch.commit();
+
+      alert("Sistema reseteado con éxito. Datos demo eliminados.");
+    } catch (err) {
+      console.error(err);
+      alert("Error durante el reset");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleResetPin = async (userId: string) => {
     const newPin = prompt("Ingresa el nuevo PIN de 4 dígitos:");
@@ -70,6 +103,14 @@ const DeveloperConsole: React.FC = () => {
           </div>
           <p className="text-slate-500 font-mono text-sm">System integrity and access control</p>
         </div>
+        <button
+            onClick={handleResetSystem}
+            disabled={resetting}
+            className="flex items-center gap-2 px-6 py-3 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl hover:bg-red-600 hover:text-white transition-all font-black uppercase text-xs tracking-widest disabled:opacity-30"
+        >
+            <Trash2 size={18} />
+            {resetting ? 'Reseteando...' : 'Reset de Producción'}
+        </button>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">

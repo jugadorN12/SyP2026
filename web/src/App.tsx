@@ -11,6 +11,9 @@ import Dashboard from './pages/Dashboard';
 import DeveloperConsole from './pages/DeveloperConsole';
 import ProductManagement from './pages/ProductManagement';
 import PromosPage from './pages/PromosPage';
+import SectorManagement from './pages/SectorManagement';
+import InitialInventoryCheck from './pages/InitialInventoryCheck';
+import BarMonitorPage from './pages/BarMonitorPage';
 import Sidebar from './components/Sidebar';
 import MobileHeader from './components/MobileHeader';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -130,6 +133,14 @@ function App() {
                     }
                   />
                   <Route
+                    path="/pos/initial-check"
+                    element={
+                      <ProtectedRoute allowedRoles={['cajero', 'encargado_barra', 'encargado_boliche', 'dueño']}>
+                        <InitialInventoryCheck />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="/transfers"
                     element={
                       <ProtectedRoute allowedRoles={['cajero', 'encargado_barra', 'encargado_boliche', 'dueño']}>
@@ -162,10 +173,26 @@ function App() {
                     }
                   />
                   <Route
+                    path="/monitor"
+                    element={
+                      <ProtectedRoute allowedRoles={['dueño', 'encargado_barra', 'encargado_boliche', 'developer']}>
+                        <BarMonitorPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="/users"
                     element={
                       <ProtectedRoute allowedRoles={['dueño', 'developer']}>
                         <UserManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/sectors"
+                    element={
+                      <ProtectedRoute allowedRoles={['dueño', 'encargado_barra', 'encargado_boliche', 'developer']}>
+                        <SectorManagement />
                       </ProtectedRoute>
                     }
                   />

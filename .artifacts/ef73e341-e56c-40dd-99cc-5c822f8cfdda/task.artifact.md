@@ -1,7 +1,8 @@
-- [x] Implementar funcionalidad de edición en `PromosPage.tsx`
-    - [x] Añadir estado `editingId`
-    - [x] Crear función `handleEditClick`
-    - [x] Modificar `handleCreatePromo` para soportar actualizaciones
-    - [x] Añadir botón de cancelar edición
-- [x] Verificar y ajustar restricciones de roles en `App.tsx`
-- [x] Verificar despliegue y funcionamiento
+- [x] **Fase 1: Lógica de Disponibilidad**
+    - [x] Modificar `InitialInventoryCheck.tsx` para cargar todo el inventario y calcular disponibilidad por producto.
+    - [x] Implementar validación visual y bloqueo de botón "Confirmar".
+- [x] **Fase 2: Monitoreo de Depósito**
+    - [x] Actualizar `BarMonitorPage.tsx` para mostrar el stock "No asignado" (Depósito).
+- [x] **Fase 3: Verificación y Seguridad**
+    - [x] Probar límites de carga entre múltiples barras.
+    - [x] Realizar deploy a Firebase.
